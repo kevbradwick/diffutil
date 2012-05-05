@@ -1,6 +1,20 @@
 import os
 import re
 
+class Diff(object):
+
+    def __init__(self, diff):
+        self._raw_diff = diff
+
+class UnifiedDiff(Diff):
+    pass
+
+class ContextDiff(Diff):
+    pass
+
+class NormalDiff(Diff):
+    pass
+
 class DiffUtil(object):
     """
     DiffUtil
@@ -16,6 +30,7 @@ class DiffUtil(object):
         When creating a new instance of DiffUtil, you can pass either the raw diff text or a string to the path
         of a diff file.
         """
+        self._diff_object = None
         if diff_file is None and diff_text is None:
             raise ValueError('You must supply diff as text of a file name to use DiffUtil')
 
@@ -40,3 +55,22 @@ class DiffUtil(object):
         if _u.search(self._diff):
             return self.TYPE_UNIFIED
         return self.TYPE_UNKNOWN
+
+    
+    def _get_diff_object(self):
+        """
+        Get the Diff object
+        """
+        if isinstance(self._diff_object, Diff):
+            return self._diff_object
+
+        if self.format == self.TYPE_UNIFIED:
+            self._diff_object = UnifiedDiff(self._diff)
+        elif self.format == self.TYPE_CONTEXT:
+            self._diff_object = ContextDiff(self._diff)
+        elif self.format == self.TYPE_NORMAL:
+            self._diff_object = NormalDiff(self._diff)
+        else:
+            raise RuntimeError('Invalid diff format supplied')
+
+        return self._diff_object
