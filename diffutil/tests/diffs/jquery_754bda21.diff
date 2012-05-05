@@ -1,0 +1,53 @@
+diff --git a/src/core.js b/src/core.js
+index 9c8314c..4242903 100644
+--- a/src/core.js
++++ b/src/core.js
+@@ -801,7 +801,7 @@ jQuery.extend({
+ 		return proxy;
+ 	},
+ 
+-	// Mutifunctional method to get and set values to a collection
++	// Multifunctional method to get and set values of a collection
+ 	// The value/s can optionally be executed if it's a function
+ 	access: function( elems, fn, key, value, chainable, emptyGet, pass ) {
+ 		var exec,
+diff --git a/src/sizzle b/src/sizzle
+index fe2f618..feebbd7 160000
+--- a/src/sizzle
++++ b/src/sizzle
+@@ -1 +1 @@
+-Subproject commit fe2f618106bb76857b229113d6d11653707d0b22
++Subproject commit feebbd7e053bff426444c7b348c776c99c7490ee
+diff --git a/test/unit/manipulation.js b/test/unit/manipulation.js
+index 18e1b8d..ff31c4d 100644
+--- a/test/unit/manipulation.js
++++ b/test/unit/manipulation.js
+@@ -7,7 +7,7 @@ var bareObj = function(value) { return value; };
+ var functionReturningObj = function(value) { return (function() { return value; }); };
+ 
+ test("text()", function() {
+-	expect(4);
++	expect(5);
+ 	var expected = "This link has class=\"blog\": Simon Willison's Weblog";
+ 	equal( jQuery("#sap").text(), expected, "Check for merged text of more then one element." );
+ 
+@@ -20,6 +20,10 @@ test("text()", function() {
+ 		frag.appendChild( document.createTextNode("foo") );
+ 
+ 	equal( jQuery( frag ).text(), "foo", "Document Fragment Text node was retreived from .text().");
++
++	var $newLineTest = jQuery("<div>test<br/>testy</div>").appendTo("#moretests");
++	$newLineTest.find("br").replaceWith("\n");
++	equal( $newLineTest.text(), "test\ntesty", "text() does not remove new lines (#11153)" );
+ });
+ 
+ test("text(undefined)", function() {
+diff --git a/version.txt b/version.txt
+index 0a182f2..0330b0e 100644
+--- a/version.txt
++++ b/version.txt
+@@ -1 +1 @@
+-1.7.2
+\ No newline at end of file
++1.7.3pre
+\ No newline at end of file

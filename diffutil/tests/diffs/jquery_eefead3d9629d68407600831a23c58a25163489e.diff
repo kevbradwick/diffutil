@@ -1,0 +1,1548 @@
+diff --git a/README.md b/README.md
+index 53b9f9d..ad38c22 100644
+--- a/README.md
++++ b/README.md
+@@ -11,6 +11,16 @@ In the spirit of open source software development, jQuery always encourages comm
+ 3. [Tips For Bug Patching](http://docs.jquery.com/Tips_for_jQuery_Bug_Patching)
+ 
+ 
++Running the Unit Tests
++--------------------------------------
++
++Run the unit tests with a local server that supports PHP. No database is required. Pre-configured php local servers are available for Windows and Mac. Here are some options:
++
++- Windows: [WAMP download](http://www.wampserver.com/en/)
++- Mac: [MAMP download](http://www.mamp.info/en/index.html)
++- Linux: [Setting up LAMP](https://www.linux.com/learn/tutorials/288158-easy-lamp-server-installation)
++- [Mongoose (most platforms)](http://code.google.com/p/mongoose/)
++
+ 
+ What you need to build your own jQuery
+ --------------------------------------
+diff --git a/build/release-notes.js b/build/release-notes.js
+index b72c72a..8707775 100644
+--- a/build/release-notes.js
++++ b/build/release-notes.js
+@@ -9,9 +9,9 @@ var fs = require("fs"),
+ 	extract = /<a href="\/ticket\/(\d+)" title="View ticket">(.*?)<[^"]+"component">\s*(\S+)/g;
+ 
+ var opts = {
+-	version: "1.7.1",
+-	short_version: "1.7.1",
+-	final_version: "1.7.1",
++	version: "1.7.2rc1",
++	short_version: "1.7.2rc1",
++	final_version: "1.7.2",
+ 	categories: []
+ };
+ 
+diff --git a/src/ajax.js b/src/ajax.js
+index 85d6a36..2bcc1d0 100644
+--- a/src/ajax.js
++++ b/src/ajax.js
+@@ -315,7 +315,7 @@ jQuery.extend({
+ 		isLocal: rlocalProtocol.test( ajaxLocParts[ 1 ] ),
+ 		global: true,
+ 		type: "GET",
+-		contentType: "application/x-www-form-urlencoded",
++		contentType: "application/x-www-form-urlencoded; charset=UTF-8",
+ 		processData: true,
+ 		async: true,
+ 		/*
+@@ -641,7 +641,7 @@ jQuery.extend({
+ 		// Apply prefilters
+ 		inspectPrefiltersOrTransports( prefilters, s, options, jqXHR );
+ 
+-		// If request was aborted inside a prefiler, stop there
++		// If request was aborted inside a prefilter, stop there
+ 		if ( state === 2 ) {
+ 			return false;
+ 		}
+diff --git a/src/ajax/jsonp.js b/src/ajax/jsonp.js
+index 6b0f95d..e1f2b53 100644
+--- a/src/ajax/jsonp.js
++++ b/src/ajax/jsonp.js
+@@ -14,8 +14,7 @@ jQuery.ajaxSetup({
+ // Detect, normalize options and install callbacks for jsonp requests
+ jQuery.ajaxPrefilter( "json jsonp", function( s, originalSettings, jqXHR ) {
+ 
+-	var inspectData = s.contentType === "application/x-www-form-urlencoded" &&
+-		( typeof s.data === "string" );
++	var inspectData = ( typeof s.data === "string" ) && /^application\/x\-www\-form\-urlencoded/.test( s.contentType );
+ 
+ 	if ( s.dataTypes[ 0 ] === "jsonp" ||
+ 		s.jsonp !== false && ( jsre.test( s.url ) ||
+diff --git a/src/ajax/xhr.js b/src/ajax/xhr.js
+index a87c323..013863d 100644
+--- a/src/ajax/xhr.js
++++ b/src/ajax/xhr.js
+@@ -148,7 +148,13 @@ if ( jQuery.support.ajax ) {
+ 									if ( xml && xml.documentElement /* #4958 */ ) {
+ 										responses.xml = xml;
+ 									}
+-									responses.text = xhr.responseText;
++
++									// When requesting binary data, IE6-9 will throw an exception
++									// on any attempt to access responseText (#11426)
++									try {
++										responses.text = xhr.responseText;
++									} catch( _ ) {
++									}
+ 
+ 									// Firefox throws an exception when accessing
+ 									// statusText for faulty cross-domain requests
+diff --git a/src/attributes.js b/src/attributes.js
+index 475f403..df7ed02 100644
+--- a/src/attributes.js
++++ b/src/attributes.js
+@@ -162,7 +162,7 @@ jQuery.fn.extend({
+ 
+ 		if ( !arguments.length ) {
+ 			if ( elem ) {
+-				hooks = jQuery.valHooks[ elem.nodeName.toLowerCase() ] || jQuery.valHooks[ elem.type ];
++				hooks = jQuery.valHooks[ elem.type ] || jQuery.valHooks[ elem.nodeName.toLowerCase() ];
+ 
+ 				if ( hooks && "get" in hooks && (ret = hooks.get( elem, "value" )) !== undefined ) {
+ 					return ret;
+@@ -206,7 +206,7 @@ jQuery.fn.extend({
+ 				});
+ 			}
+ 
+-			hooks = jQuery.valHooks[ this.nodeName.toLowerCase() ] || jQuery.valHooks[ this.type ];
++			hooks = jQuery.valHooks[ this.type ] || jQuery.valHooks[ this.nodeName.toLowerCase() ];
+ 
+ 			// If set returns undefined, fall back to normal setting
+ 			if ( !hooks || !("set" in hooks) || hooks.set( this, val, "value" ) === undefined ) {
+@@ -352,7 +352,7 @@ jQuery.extend({
+ 	},
+ 
+ 	removeAttr: function( elem, value ) {
+-		var propName, attrNames, name, l,
++		var propName, attrNames, name, l, isBool,
+ 			i = 0;
+ 
+ 		if ( value && elem.nodeType === 1 ) {
+@@ -364,13 +364,17 @@ jQuery.extend({
+ 
+ 				if ( name ) {
+ 					propName = jQuery.propFix[ name ] || name;
++					isBool = rboolean.test( name );
+ 
+ 					// See #9699 for explanation of this approach (setting first, then removal)
+-					jQuery.attr( elem, name, "" );
++					// Do not do this for boolean attributes (see #10870)
++					if ( !isBool ) {
++						jQuery.attr( elem, name, "" );
++					}
+ 					elem.removeAttribute( getSetAttribute ? name : propName );
+ 
+ 					// Set corresponding property to false for boolean attributes
+-					if ( rboolean.test( name ) && propName in elem ) {
++					if ( isBool && propName in elem ) {
+ 						elem[ propName ] = false;
+ 					}
+ 				}
+@@ -524,7 +528,8 @@ if ( !getSetAttribute ) {
+ 
+ 	fixSpecified = {
+ 		name: true,
+-		id: true
++		id: true,
++		coords: true
+ 	};
+ 
+ 	// Use this for any attribute in IE6/7
+diff --git a/src/core.js b/src/core.js
+index 9a55144..4242903 100644
+--- a/src/core.js
++++ b/src/core.js
+@@ -557,6 +557,9 @@ jQuery.extend({
+ 
+ 	// Cross-browser xml parsing
+ 	parseXML: function( data ) {
++		if ( typeof data !== "string" || !data ) {
++			return null;
++		}
+ 		var xml, tmp;
+ 		try {
+ 			if ( window.DOMParser ) { // Standard
+@@ -798,7 +801,7 @@ jQuery.extend({
+ 		return proxy;
+ 	},
+ 
+-	// Mutifunctional method to get and set values to a collection
++	// Multifunctional method to get and set values of a collection
+ 	// The value/s can optionally be executed if it's a function
+ 	access: function( elems, fn, key, value, chainable, emptyGet, pass ) {
+ 		var exec,
+diff --git a/src/css.js b/src/css.js
+index 68b8098..960ac5a 100644
+--- a/src/css.js
++++ b/src/css.js
+@@ -163,7 +163,7 @@ jQuery.extend({
+ 	}
+ });
+ 
+-// DEPRECATED, Use jQuery.css() instead
++// DEPRECATED in 1.3, Use jQuery.css() instead
+ jQuery.curCSS = jQuery.css;
+ 
+ if ( document.defaultView && document.defaultView.getComputedStyle ) {
+diff --git a/src/data.js b/src/data.js
+index 26bef32..017bd2e 100644
+--- a/src/data.js
++++ b/src/data.js
+@@ -333,7 +333,7 @@ function dataAttr( elem, key, data ) {
+ 				data = data === "true" ? true :
+ 				data === "false" ? false :
+ 				data === "null" ? null :
+-				jQuery.isNumeric( data ) ? parseFloat( data ) :
++				jQuery.isNumeric( data ) ? +data :
+ 					rbrace.test( data ) ? jQuery.parseJSON( data ) :
+ 					data;
+ 			} catch( e ) {}
+diff --git a/src/dimensions.js b/src/dimensions.js
+index 769b996..64da9f4 100644
+--- a/src/dimensions.js
++++ b/src/dimensions.js
+@@ -34,7 +34,7 @@ jQuery.each( { Height: "height", Width: "width" }, function( name, type ) {
+ 				// 3rd condition allows Nokia support, as it supports the docElem prop but not CSS1Compat
+ 				doc = elem.document;
+ 				docElemProp = doc.documentElement[ clientProp ];
+-				return doc.compatMode === "CSS1Compat" && docElemProp ||
++				return jQuery.support.boxModel && docElemProp ||
+ 					doc.body && doc.body[ clientProp ] || docElemProp;
+ 			}
+ 
+@@ -42,8 +42,16 @@ jQuery.each( { Height: "height", Width: "width" }, function( name, type ) {
+ 			if ( elem.nodeType === 9 ) {
+ 				// Either scroll[Width/Height] or offset[Width/Height], whichever is greater
+ 				doc = elem.documentElement;
++
++				// when a window > document, IE6 reports a offset[Width/Height] > client[Width/Height]
++				// so we can't use max, as it'll choose the incorrect offset[Width/Height]
++				// instead we use the correct client[Width/Height]
++				// support:IE6
++				if ( doc[ clientProp ] >= doc[ scrollProp ] ) {
++					return doc[ clientProp ];
++				}
++
+ 				return Math.max(
+-					doc[ clientProp ],
+ 					elem.body[ scrollProp ], doc[ scrollProp ],
+ 					elem.body[ offsetProp ], doc[ offsetProp ]
+ 				);
+diff --git a/src/effects.js b/src/effects.js
+index 3464381..e154d2b 100644
+--- a/src/effects.js
++++ b/src/effects.js
+@@ -157,7 +157,7 @@ jQuery.fn.extend({
+ 					prop[ name ] = prop[ p ];
+ 					delete prop[ p ];
+ 				}
+-				
++
+ 				if ( ( hooks = jQuery.cssHooks[ name ] ) && "expand" in hooks ) {
+ 					replace = hooks.expand( prop[ name ] );
+ 					delete prop[ name ];
+@@ -400,11 +400,11 @@ jQuery.extend({
+ 	},
+ 
+ 	easing: {
+-		linear: function( p, n, firstNum, diff ) {
+-			return firstNum + diff * p;
++		linear: function( p ) {
++			return p;
+ 		},
+-		swing: function( p, n, firstNum, diff ) {
+-			return ( ( -Math.cos( p*Math.PI ) / 2 ) + 0.5 ) * diff + firstNum;
++		swing: function( p ) {
++			return ( -Math.cos( p*Math.PI ) / 2 ) + 0.5;
+ 		}
+ 	},
+ 
+@@ -634,12 +634,14 @@ jQuery.extend( jQuery.fx, {
+ 	}
+ });
+ 
+-// Adds width/height step functions
+-// Do not set anything below 0
+-jQuery.each([ "width", "height" ], function( i, prop ) {
+-	jQuery.fx.step[ prop ] = function( fx ) {
+-		jQuery.style( fx.elem, prop, Math.max(0, fx.now) + fx.unit );
+-	};
++// Ensure props that can't be negative don't go there on undershoot easing
++jQuery.each( fxAttrs.concat.apply( [], fxAttrs ), function( i, prop ) {
++	// exclude marginTop, marginLeft, marginBottom and marginRight from this list
++	if ( prop.indexOf( "margin" ) ) {
++		jQuery.fx.step[ prop ] = function( fx ) {
++			jQuery.style( fx.elem, prop, Math.max(0, fx.now) + fx.unit );
++		};
++	}
+ });
+ 
+ if ( jQuery.expr && jQuery.expr.filters ) {
+@@ -676,7 +678,7 @@ function defaultDisplay( nodeName ) {
+ 			// document to it; WebKit & Firefox won't allow reusing the iframe document.
+ 			if ( !iframeDoc || !iframe.createElement ) {
+ 				iframeDoc = ( iframe.contentWindow || iframe.contentDocument ).document;
+-				iframeDoc.write( ( document.compatMode === "CSS1Compat" ? "<!doctype html>" : "" ) + "<html><body>" );
++				iframeDoc.write( ( jQuery.support.boxModel ? "<!doctype html>" : "" ) + "<html><body>" );
+ 				iframeDoc.close();
+ 			}
+ 
+diff --git a/src/event.js b/src/event.js
+index 6bb4fa8..621464f 100644
+--- a/src/event.js
++++ b/src/event.js
+@@ -391,6 +391,7 @@ jQuery.event = {
+ 			delegateCount = handlers.delegateCount,
+ 			args = [].slice.call( arguments, 0 ),
+ 			run_all = !event.exclusive && !event.namespace,
++			special = jQuery.event.special[ event.type ] || {},
+ 			handlerQueue = [],
+ 			i, j, cur, jqcur, ret, selMatch, matched, matches, handleObj, sel, related;
+ 
+@@ -398,6 +399,11 @@ jQuery.event = {
+ 		args[0] = event;
+ 		event.delegateTarget = this;
+ 
++		// Call the preDispatch hook for the mapped type, and let it bail if desired
++		if ( special.preDispatch && special.preDispatch.call( this, event ) === false ) {
++			return;
++		}
++
+ 		// Determine handlers that should run if there are delegated events
+ 		// Avoid non-left-click bubbling in Firefox (#3861)
+ 		if ( delegateCount && !(event.button && event.type === "click") ) {
+@@ -407,7 +413,7 @@ jQuery.event = {
+ 			jqcur.context = this.ownerDocument || this;
+ 
+ 			for ( cur = event.target; cur != this; cur = cur.parentNode || this ) {
+-			
++
+ 				// Don't process events on disabled elements (#6911, #8165)
+ 				if ( cur.disabled !== true ) {
+ 					selMatch = {};
+@@ -467,6 +473,11 @@ jQuery.event = {
+ 			}
+ 		}
+ 
++		// Call the postDispatch hook for the mapped type
++		if ( special.postDispatch ) {
++			special.postDispatch.call( this, event );
++		}
++
+ 		return event.result;
+ 	},
+ 
+@@ -758,16 +769,23 @@ if ( !jQuery.support.submitBubbles ) {
+ 					form = jQuery.nodeName( elem, "input" ) || jQuery.nodeName( elem, "button" ) ? elem.form : undefined;
+ 				if ( form && !form._submit_attached ) {
+ 					jQuery.event.add( form, "submit._submit", function( event ) {
+-						// If form was submitted by the user, bubble the event up the tree
+-						if ( this.parentNode && !event.isTrigger ) {
+-							jQuery.event.simulate( "submit", this.parentNode, event, true );
+-						}
++						event._submit_bubble = true;
+ 					});
+ 					form._submit_attached = true;
+ 				}
+ 			});
+ 			// return undefined since we don't need an event listener
+ 		},
++		
++		postDispatch: function( event ) {
++			// If form was submitted by the user, bubble the event up the tree
++			if ( event._submit_bubble ) {
++				delete event._submit_bubble;
++				if ( this.parentNode && !event.isTrigger ) {
++					jQuery.event.simulate( "submit", this.parentNode, event, true );
++				}
++			}
++		},
+ 
+ 		teardown: function() {
+ 			// Only need this for delegated form submit events
+diff --git a/src/manipulation.js b/src/manipulation.js
+index 52a869d..2a37579 100644
+--- a/src/manipulation.js
++++ b/src/manipulation.js
+@@ -24,7 +24,7 @@ var nodeNames = "abbr|article|aside|audio|bdi|canvas|data|datalist|details|figca
+ 	rhtml = /<|&#?\w+;/,
+ 	rnoInnerhtml = /<(?:script|style)/i,
+ 	rnocache = /<(?:script|object|embed|option|style)/i,
+-	rnoshimcache = new RegExp("<(?:" + nodeNames + ")", "i"),
++	rnoshimcache = new RegExp("<(?:" + nodeNames + ")[\\s/>]", "i"),
+ 	// checked="checked" or checked
+ 	rchecked = /checked\s*(?:[^=]|=\s*.checked.)/i,
+ 	rscriptType = /\/(java|ecma)script/i,
+@@ -351,6 +351,8 @@ jQuery.fn.extend({
+ 				jQuery.each( scripts, function( i, elem ) {
+ 					if ( elem.src ) {
+ 						jQuery.ajax({
++							type: "GET",
++							global: false,
+ 							url: elem.src,
+ 							async: false,
+ 							dataType: "script"
+@@ -456,12 +458,16 @@ function cloneFixAttributes( src, dest ) {
+ 	// cloning other types of input fields
+ 	} else if ( nodeName === "input" || nodeName === "textarea" ) {
+ 		dest.defaultValue = src.defaultValue;
++
++	// IE blanks contents when cloning scripts
++	} else if ( nodeName === "script" && dest.text !== src.text ) {
++		dest.text = src.text;
+ 	}
+ 
+ 	// Event data gets referenced instead of copied if the expando
+ 	// gets copied too
+ 	dest.removeAttribute( jQuery.expando );
+-	
++
+ 	// Clear flags for bubbling special change/submit events, they must
+ 	// be reattached when the newly cloned events are first activated
+ 	dest.removeAttribute( "_submit_attached" );
+@@ -590,7 +596,7 @@ jQuery.extend({
+ 			destElements,
+ 			i,
+ 			// IE<=8 does not properly clone detached, unknown element nodes
+-			clone = jQuery.support.html5Clone || !rnoshimcache.test( "<" + elem.nodeName ) ?
++			clone = jQuery.support.html5Clone || jQuery.isXMLDoc(elem) || !rnoshimcache.test( "<" + elem.nodeName + ">" ) ?
+ 				elem.cloneNode( true ) :
+ 				shimCloneNode( elem );
+ 
+@@ -640,7 +646,8 @@ jQuery.extend({
+ 	},
+ 
+ 	clean: function( elems, context, fragment, scripts ) {
+-		var checkScriptType;
++		var checkScriptType, script, j,
++				ret = [];
+ 
+ 		context = context || document;
+ 
+@@ -649,8 +656,6 @@ jQuery.extend({
+ 			context = context.ownerDocument || context[0] && context[0].ownerDocument || document;
+ 		}
+ 
+-		var ret = [], j;
+-
+ 		for ( var i = 0, elem; (elem = elems[i]) != null; i++ ) {
+ 			if ( typeof elem === "number" ) {
+ 				elem += "";
+@@ -672,7 +677,9 @@ jQuery.extend({
+ 					var tag = ( rtagName.exec( elem ) || ["", ""] )[1].toLowerCase(),
+ 						wrap = wrapMap[ tag ] || wrapMap._default,
+ 						depth = wrap[0],
+-						div = context.createElement("div");
++						div = context.createElement("div"),
++						safeChildNodes = safeFragment.childNodes,
++						remove;
+ 
+ 					// Append wrapper element to unknown element safe doc fragment
+ 					if ( context === document ) {
+@@ -717,6 +724,21 @@ jQuery.extend({
+ 					}
+ 
+ 					elem = div.childNodes;
++
++					// Clear elements from DocumentFragment (safeFragment or otherwise)
++					// to avoid hoarding elements. Fixes #11356
++					if ( div ) {
++						div.parentNode.removeChild( div );
++
++						// Guard against -1 index exceptions in FF3.6
++						if ( safeChildNodes.length > 0 ) {
++							remove = safeChildNodes[ safeChildNodes.length - 1 ];
++
++							if ( remove && remove.parentNode ) {
++								remove.parentNode.removeChild( remove );
++							}
++						}
++					}
+ 				}
+ 			}
+ 
+@@ -745,16 +767,17 @@ jQuery.extend({
+ 				return !elem.type || rscriptType.test( elem.type );
+ 			};
+ 			for ( i = 0; ret[i]; i++ ) {
+-				if ( scripts && jQuery.nodeName( ret[i], "script" ) && (!ret[i].type || ret[i].type.toLowerCase() === "text/javascript") ) {
+-					scripts.push( ret[i].parentNode ? ret[i].parentNode.removeChild( ret[i] ) : ret[i] );
++				script = ret[i];
++				if ( scripts && jQuery.nodeName( script, "script" ) && (!script.type || rscriptType.test( script.type )) ) {
++					scripts.push( script.parentNode ? script.parentNode.removeChild( script ) : script );
+ 
+ 				} else {
+-					if ( ret[i].nodeType === 1 ) {
+-						var jsTags = jQuery.grep( ret[i].getElementsByTagName( "script" ), checkScriptType );
++					if ( script.nodeType === 1 ) {
++						var jsTags = jQuery.grep( script.getElementsByTagName( "script" ), checkScriptType );
+ 
+ 						ret.splice.apply( ret, [i + 1, 0].concat( jsTags ) );
+ 					}
+-					fragment.appendChild( ret[i] );
++					fragment.appendChild( script );
+ 				}
+ 			}
+ 		}
+diff --git a/src/queue.js b/src/queue.js
+index da3e597..907baf4 100644
+--- a/src/queue.js
++++ b/src/queue.js
+@@ -174,7 +174,7 @@ jQuery.fn.extend({
+ 			}
+ 		}
+ 		resolve();
+-		return defer.promise();
++		return defer.promise( object );
+ 	}
+ });
+ 
+diff --git a/src/sizzle b/src/sizzle
+index fe2f618..feebbd7 160000
+--- a/src/sizzle
++++ b/src/sizzle
+@@ -1 +1 @@
+-Subproject commit fe2f618106bb76857b229113d6d11653707d0b22
++Subproject commit feebbd7e053bff426444c7b348c776c99c7490ee
+diff --git a/src/support.js b/src/support.js
+index 291089e..baebaa2 100644
+--- a/src/support.js
++++ b/src/support.js
+@@ -8,7 +8,6 @@ jQuery.support = (function() {
+ 		select,
+ 		opt,
+ 		input,
+-		marginDiv,
+ 		fragment,
+ 		tds,
+ 		events,
+@@ -95,6 +94,9 @@ jQuery.support = (function() {
+ 		pixelMargin: true
+ 	};
+ 
++	// jQuery.boxModel DEPRECATED in 1.3, use jQuery.support.boxModel instead
++	jQuery.boxModel = support.boxModel = (document.compatMode === "CSS1Compat");
++
+ 	// Make sure checked status is properly cloned
+ 	input.checked = true;
+ 	support.noCloneChecked = input.cloneNode( true ).checked;
+@@ -129,6 +131,10 @@ jQuery.support = (function() {
+ 	support.radioValue = input.value === "t";
+ 
+ 	input.setAttribute("checked", "checked");
++
++	// #11217 - WebKit loses check when the name is after the checked attribute
++	input.setAttribute( "name", "t" );
++
+ 	div.appendChild( input );
+ 	fragment = document.createDocumentFragment();
+ 	fragment.appendChild( div.lastChild );
+@@ -143,23 +149,6 @@ jQuery.support = (function() {
+ 	fragment.removeChild( input );
+ 	fragment.appendChild( div );
+ 
+-	div.innerHTML = "";
+-
+-	// Check if div with explicit width and no margin-right incorrectly
+-	// gets computed margin-right based on width of container. For more
+-	// info see bug #3333
+-	// Fails in WebKit before Feb 2011 nightlies
+-	// WebKit Bug 13343 - getComputedStyle returns wrong value for margin-right
+-	if ( window.getComputedStyle ) {
+-		marginDiv = document.createElement( "div" );
+-		marginDiv.style.width = "0";
+-		marginDiv.style.marginRight = "0";
+-		div.style.width = "2px";
+-		div.appendChild( marginDiv );
+-		support.reliableMarginRight =
+-			( parseInt( ( window.getComputedStyle( marginDiv, null ) || { marginRight: 0 } ).marginRight, 10 ) || 0 ) === 0;
+-	}
+-
+ 	// Technique from Juriy Zaytsev
+ 	// http://perfectionkills.com/detecting-event-support-without-browser-sniffing/
+ 	// We only care about the case where non-standard event systems
+@@ -185,12 +174,13 @@ jQuery.support = (function() {
+ 	fragment.removeChild( div );
+ 
+ 	// Null elements to avoid leaks in IE
+-	fragment = select = opt = marginDiv = div = input = null;
++	fragment = select = opt = div = input = null;
+ 
+ 	// Run tests that need a body at doc ready
+ 	jQuery(function() {
+ 		var container, outer, inner, table, td, offsetSupport,
+-			conMarginTop, ptlm, vb, style, html,
++			marginDiv, conMarginTop, style, html, positionTopLeftWidthHeight,
++			paddingMarginBorderVisibility, paddingMarginBorder,
+ 			body = document.getElementsByTagName("body")[0];
+ 
+ 		if ( !body ) {
+@@ -199,15 +189,16 @@ jQuery.support = (function() {
+ 		}
+ 
+ 		conMarginTop = 1;
+-		ptlm = "position:absolute;top:0;left:0;width:1px;height:1px;margin:0;";
+-		vb = "visibility:hidden;border:0;";
+-		style = "style='" + ptlm + "border:5px solid #000;padding:0;'";
+-		html = "<div " + style + "><div></div></div>" +
+-			"<table " + style + " cellpadding='0' cellspacing='0'>" +
++		paddingMarginBorder = "padding:0;margin:0;border:";
++		positionTopLeftWidthHeight = "position:absolute;top:0;left:0;width:1px;height:1px;";
++		paddingMarginBorderVisibility = paddingMarginBorder + "0;visibility:hidden;";
++		style = "style='" + positionTopLeftWidthHeight + paddingMarginBorder + "5px solid #000;";
++		html = "<div " + style + "display:block;'><div style='" + paddingMarginBorder + "0;display:block;overflow:hidden;'></div></div>" +
++			"<table " + style + "' cellpadding='0' cellspacing='0'>" +
+ 			"<tr><td></td></tr></table>";
+ 
+ 		container = document.createElement("div");
+-		container.style.cssText = vb + "width:0;height:0;position:static;top:0;margin-top:" + conMarginTop + "px";
++		container.style.cssText = paddingMarginBorderVisibility + "width:0;height:0;position:static;top:0;margin-top:" + conMarginTop + "px";
+ 		body.insertBefore( container, body.firstChild );
+ 
+ 		// Construct the test element
+@@ -221,8 +212,7 @@ jQuery.support = (function() {
+ 		// display:none (it is still safe to use offsets if a parent element is
+ 		// hidden; don safety goggles and see bug #4512 for more information).
+ 		// (only IE 8 fails this test)
+-		div.innerHTML = "<table><tr><td style='padding:0;border:0;display:none'></td><td>t</td></tr></table>";
+-
++		div.innerHTML = "<table><tr><td style='" + paddingMarginBorder + "0;display:none'></td><td>t</td></tr></table>";
+ 		tds = div.getElementsByTagName( "td" );
+ 		isSupported = ( tds[ 0 ].offsetHeight === 0 );
+ 
+@@ -233,28 +223,44 @@ jQuery.support = (function() {
+ 		// (IE <= 8 fail this test)
+ 		support.reliableHiddenOffsets = isSupported && ( tds[ 0 ].offsetHeight === 0 );
+ 
+-		// Figure out if the W3C box model works as expected
+-		div.innerHTML = "";
+-		div.style.width = div.style.paddingLeft = "1px";
+-		jQuery.boxModel = support.boxModel = div.offsetWidth === 2;
++		// Check if div with explicit width and no margin-right incorrectly
++		// gets computed margin-right based on width of container. For more
++		// info see bug #3333
++		// Fails in WebKit before Feb 2011 nightlies
++		// WebKit Bug 13343 - getComputedStyle returns wrong value for margin-right
++		if ( window.getComputedStyle ) {
++			div.innerHTML = "";
++			marginDiv = document.createElement( "div" );
++			marginDiv.style.width = "0";
++			marginDiv.style.marginRight = "0";
++			div.style.width = "2px";
++			div.appendChild( marginDiv );
++			support.reliableMarginRight =
++				( parseInt( ( window.getComputedStyle( marginDiv, null ) || { marginRight: 0 } ).marginRight, 10 ) || 0 ) === 0;
++		}
+ 
+ 		if ( typeof div.style.zoom !== "undefined" ) {
+ 			// Check if natively block-level elements act like inline-block
+ 			// elements when setting their display to 'inline' and giving
+ 			// them layout
+ 			// (IE < 8 does this)
++			div.innerHTML = "";
++			div.style.width = div.style.padding = "1px";
++			div.style.border = 0;
++			div.style.overflow = "hidden";
+ 			div.style.display = "inline";
+ 			div.style.zoom = 1;
+-			support.inlineBlockNeedsLayout = ( div.offsetWidth === 2 );
++			support.inlineBlockNeedsLayout = ( div.offsetWidth === 3 );
+ 
+ 			// Check if elements with layout shrink-wrap their children
+ 			// (IE 6 does this)
+-			div.style.display = "";
+-			div.innerHTML = "<div style='width:4px;'></div>";
+-			support.shrinkWrapBlocks = ( div.offsetWidth !== 2 );
++			div.style.display = "block";
++			div.style.overflow = "visible";
++			div.innerHTML = "<div style='width:5px;'></div>";
++			support.shrinkWrapBlocks = ( div.offsetWidth !== 3 );
+ 		}
+ 
+-		div.style.cssText = ptlm + vb;
++		div.style.cssText = positionTopLeftWidthHeight + paddingMarginBorderVisibility;
+ 		div.innerHTML = html;
+ 
+ 		outer = div.firstChild;
+@@ -289,7 +295,7 @@ jQuery.support = (function() {
+ 		}
+ 
+ 		body.removeChild( container );
+-		div = container = null;
++		marginDiv = div = container = null;
+ 
+ 		jQuery.extend( support, offsetSupport );
+ 	});
+diff --git a/src/traversing.js b/src/traversing.js
+index c342e15..08c95ec 100644
+--- a/src/traversing.js
++++ b/src/traversing.js
+@@ -204,7 +204,7 @@ jQuery.each({
+ 		return jQuery.dir( elem, "previousSibling", until );
+ 	},
+ 	siblings: function( elem ) {
+-		return jQuery.sibling( elem.parentNode.firstChild, elem );
++		return jQuery.sibling( ( elem.parentNode || {} ).firstChild, elem );
+ 	},
+ 	children: function( elem ) {
+ 		return jQuery.sibling( elem.firstChild );
+diff --git a/test/data/1x1.jpg b/test/data/1x1.jpg
+new file mode 100644
+index 0000000..b0d6911
+Binary files /dev/null and b/test/data/1x1.jpg differ
+diff --git a/test/data/dimensions/documentLarge.html b/test/data/dimensions/documentLarge.html
+new file mode 100644
+index 0000000..8b434e7
+--- /dev/null
++++ b/test/data/dimensions/documentLarge.html
+@@ -0,0 +1,17 @@
++<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
++<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" dir="ltr" id="html">
++<head>
++	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
++	<style>
++		body {
++			width: 1000px;
++			height: 1000px;
++		}
++	</style>
++</head>
++<body>
++	<div>
++		<script src="../include_js.php"></script>
++	</div>
++</body>
++</html>
+\ No newline at end of file
+diff --git a/test/data/dimensions/documentSmall.html b/test/data/dimensions/documentSmall.html
+new file mode 100644
+index 0000000..e0e9a3d
+--- /dev/null
++++ b/test/data/dimensions/documentSmall.html
+@@ -0,0 +1,11 @@
++<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
++<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" dir="ltr" id="html">
++<head>
++	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
++</head>
++<body>
++	<div>
++		<script src="../include_js.php"></script>
++	</div>
++</body>
++</html>
+\ No newline at end of file
+diff --git a/test/data/evalScript.php b/test/data/evalScript.php
+new file mode 100644
+index 0000000..ea9b8c5
+--- /dev/null
++++ b/test/data/evalScript.php
+@@ -0,0 +1 @@
++ok( "<?php echo $_SERVER['REQUEST_METHOD'] ?>" === "GET", "request method is <?php echo $_SERVER['REQUEST_METHOD'] ?>" );
+\ No newline at end of file
+diff --git a/test/data/include_js.php b/test/data/include_js.php
+index 467a6b2..23207a9 100644
+--- a/test/data/include_js.php
++++ b/test/data/include_js.php
+@@ -69,7 +69,11 @@ die();
+ ?>
+ */
+ 
++hasPHP = false;
++
+ // javascript fallback using src files in case this is not run on a PHP server!
++// please note that this fallback is for convenience only, and is not fully supported
++// i.e. don't expect all of the tests to work properly
+ var baseURL = document.location.href.replace( /\/test\/.+/, "/"),
+ 	files = [
+ 		"core",
+@@ -99,4 +103,4 @@ var baseURL = document.location.href.replace( /\/test\/.+/, "/"),
+ 
+ for ( ; i < len; i++ ) {
+ 	document.write("<script src=\"" + baseURL + "src/" + files[ i ] + ".js\"><"+"/script>");
+-}
++}
+\ No newline at end of file
+diff --git a/test/data/support/bodyBackground.html b/test/data/support/bodyBackground.html
+index cd3744b..0f12e75 100644
+--- a/test/data/support/bodyBackground.html
++++ b/test/data/support/bodyBackground.html
+@@ -6,6 +6,13 @@
+ 		body {
+ 			background: #000000;
+ 		}
++
++		div {
++			padding: 15px;
++			border: 1px solid #999;
++			display: inline;
++			margin:8px;
++		}
+ 	</style>
+ </head>
+ <body>
+diff --git a/test/data/testinit.js b/test/data/testinit.js
+index aeda243..43244e7 100644
+--- a/test/data/testinit.js
++++ b/test/data/testinit.js
+@@ -2,6 +2,7 @@ var jQuery = this.jQuery || "jQuery", // For testing .noConflict()
+ 	$ = this.$ || "$",
+ 	originaljQuery = jQuery,
+ 	original$ = $,
++	hasPHP = true,
+ 	amdDefined;
+ 
+ /**
+@@ -117,5 +118,45 @@ function url(value) {
+ 			equal( jQuery.active, 0, "No AJAX requests are still active" );
+ 			oldActive = jQuery.active;
+ 		}
+-	}
+-}());
+\ No newline at end of file
++	};
++
++	this.testIframe = function( fileName, name, fn ) {
++
++		test(name, function() {
++			// pause execution for now
++			stop();
++
++			// load fixture in iframe
++			var iframe = loadFixture(),
++				win = iframe.contentWindow,
++				interval = setInterval( function() {
++					if ( win && win.jQuery && win.jQuery.isReady ) {
++						clearInterval( interval );
++						// continue
++						start();
++						// call actual tests passing the correct jQuery instance to use
++						fn.call( this, win.jQuery, win, win.document );
++						document.body.removeChild( iframe );
++						iframe = null;
++					}
++				}, 15 );
++		});
++
++		function loadFixture() {
++			var src = "./data/" + fileName + ".html?" + parseInt( Math.random()*1000, 10 ),
++				iframe = jQuery("<iframe />").css({
++					width: 500, height: 500, position: "absolute", top: -600, left: -600, visibility: "hidden"
++				}).appendTo("body")[0];
++			iframe.contentWindow.location = src;
++			return iframe;
++		}
++	};
++}());
++
++// Sandbox start for great justice
++(function() {
++	var oldStart = window.start;
++	window.start = function() {
++		oldStart();
++	};
++})();
+\ No newline at end of file
+diff --git a/test/unit/ajax.js b/test/unit/ajax.js
+index ca85191..de680cb 100644
+--- a/test/unit/ajax.js
++++ b/test/unit/ajax.js
+@@ -1,11 +1,6 @@
+ module("ajax", { teardown: moduleTeardown });
+ 
+-// Safari 3 randomly crashes when running these tests,
+-// but only in the full suite - you can run just the Ajax
+-// tests and they'll pass
+-//if ( !jQuery.browser.safari ) {
+-
+-if ( !isLocal ) {
++if ( !isLocal || hasPHP) {
+ 
+ test("jQuery.ajax() - success callbacks", function() {
+ 	expect( 8 );
+@@ -1292,7 +1287,9 @@ test("jQuery.getScript(String, Function) - with callback", function() {
+ 	jQuery.getScript(url("data/test.js"), function( data, _, jqXHR ) {
+ 		equal( foobar, "bar", "Check if script was evaluated" );
+ 		strictEqual( data, jqXHR.responseText, "Same-domain script requests returns the source of the script (#8082)" );
+-		setTimeout(start, 100);
++		setTimeout(function() {
++			start();
++		}, 1000 );
+ 	});
+ });
+ 
+@@ -2327,10 +2324,42 @@ test("jQuery.ajax - abort in prefilter", function() {
+ 
+ });
+ 
++test( "jQuery.ajax - loading binary data shouldn't throw an exception in IE (#11426)", 1, function() {
++	stop();
++	jQuery.ajax( url( "data/1x1.jpg" ), {
++		success: function( data ) {
++			ok( data === undefined || /JFIF/.test( data ) , "success callback reached" );
++			start();
++		},
++		error: function( _, __, error ) {
++			ok( false, "exception thrown: '" + error + "'" );
++			start();
++		}
++	});
++});
++
++test( "jQuery.domManip - no side effect because of ajaxSetup or global events (#11264)", function() {
++	expect( 1 );
++
++	jQuery.ajaxSetup({
++		type: "POST"
++	});
++
++	jQuery( document ).bind( "ajaxStart ajaxStop", function() {
++		ok( false, "Global event triggered" );
++	});
++
++	jQuery( "#qunit-fixture" ).append( "<script src='data/evalScript.php'></script>" );
++
++	jQuery( document ).unbind( "ajaxStart ajaxStop" );
++
++	jQuery.ajaxSetup({
++		type: "GET"
++	});
++});
++
+ test("jQuery.ajax - active counter", function() {
+     ok( jQuery.active == 0, "ajax active counter should be zero: " + jQuery.active );
+ });
+ 
+-}
+-
+-//}
++}
+\ No newline at end of file
+diff --git a/test/unit/attributes.js b/test/unit/attributes.js
+index dbfa8c0..dd21b65 100644
+--- a/test/unit/attributes.js
++++ b/test/unit/attributes.js
+@@ -464,7 +464,7 @@ test("attr('tabindex', value)", function() {
+ });
+ 
+ test("removeAttr(String)", function() {
+-	expect(9);
++	expect( 10 );
+ 	var $first;
+ 
+ 	equal( jQuery("#mark").removeAttr( "class" ).attr("class"), undefined, "remove class" );
+@@ -479,6 +479,9 @@ test("removeAttr(String)", function() {
+ 	jQuery("#text1").prop("readOnly", true).removeAttr("readonly");
+ 	equal( document.getElementById("text1").readOnly, false, "removeAttr sets boolean properties to false" );
+ 
++	jQuery("#option2c").removeAttr("selected");
++	equal( jQuery("#option2d").attr("selected"), "selected", "Removing `selected` from an option that is not selected does not remove selected from the currently selected option (#10870)");
++
+ 	try {
+ 		$first = jQuery("#first").attr("contenteditable", "true").removeAttr("contenteditable");
+ 		equal( $first.attr('contenteditable'), undefined, "Remove the contenteditable attribute" );
+@@ -1176,3 +1179,16 @@ test("contents().hasClass() returns correct values", function() {
+ 	ok( $contents.hasClass("foo"), "Found 'foo' in $contents" );
+ 	ok( !$contents.hasClass("undefined"), "Did not find 'undefined' in $contents (correctly)" );
+ });
++
++test("coords returns correct values in IE6/IE7, see #10828", function() {
++	expect(2);
++
++	var map = jQuery("<map />"),
++		area;
++
++	area = map.html("<area shape='rect' coords='0,0,0,0' href='#' alt='a' />").find("area");
++	equal( area.attr("coords"), "0,0,0,0", "did not retrieve coords correctly");
++
++	area = map.html("<area shape='rect' href='#' alt='a' /></map>").find("area");
++	equal( area.attr("coords"), undefined, "did not retrieve coords correctly");
++});
+diff --git a/test/unit/core.js b/test/unit/core.js
+index 214b7ca..e87c106 100644
+--- a/test/unit/core.js
++++ b/test/unit/core.js
+@@ -1,5 +1,11 @@
+ module("core", { teardown: moduleTeardown });
+ 
++test("Unit Testing Environment", function () {
++	expect(2);
++	ok( hasPHP, "Running Unit tests without PHP is unsupported! The AJAX tests won't run without it and don't expect all tests to pass without it!" );
++	ok( !isLocal, "Unit tests shouldn't be run from file://, especially in Chrome. If you must test from file:// with Chrome, run it with the --allow-file-access-from-files flag!" );
++});
++
+ test("Basic requirements", function() {
+ 	expect(7);
+ 	ok( Array.prototype.push, "Array.push()" );
+@@ -1107,7 +1113,7 @@ test("jQuery.parseJSON", function(){
+ 	}
+ });
+ 
+-test("jQuery.parseXML", 4, function(){
++test("jQuery.parseXML", 8, function(){
+ 	var xml, tmp;
+ 	try {
+ 		xml = jQuery.parseXML( "<p>A <b>well-formed</b> xml string</p>" );
+@@ -1125,6 +1131,18 @@ test("jQuery.parseXML", 4, function(){
+ 	} catch( e ) {
+ 		strictEqual( e.message, "Invalid XML: <p>Not a <<b>well-formed</b> xml string</p>", "invalid xml detected" );
+ 	}
++	try {
++		xml = jQuery.parseXML( "" );
++		strictEqual( xml, null, "empty string => null document" );
++		xml = jQuery.parseXML();
++		strictEqual( xml, null, "undefined string => null document" );
++		xml = jQuery.parseXML( null );
++		strictEqual( xml, null, "null string => null document" );
++		xml = jQuery.parseXML( true );
++		strictEqual( xml, null, "non-string => null document" );
++	} catch( e ) {
++		ok( false, "empty input throws exception" );
++	}
+ });
+ 
+ test("jQuery.sub() - Static Methods", function(){
+diff --git a/test/unit/data.js b/test/unit/data.js
+index 006e29e..7598ba8 100644
+--- a/test/unit/data.js
++++ b/test/unit/data.js
+@@ -298,7 +298,7 @@ test(".data(String) and .data(String, Object)", function() {
+ });
+ 
+ test("data-* attributes", function() {
+-	expect(37);
++	expect(38);
+ 	var div = jQuery("<div>"),
+ 		child = jQuery("<div data-myobj='old data' data-ignored=\"DOM\" data-other='test'></div>"),
+ 		dummy = jQuery("<div data-myobj='old data' data-ignored=\"DOM\" data-other='test'></div>");
+@@ -356,6 +356,7 @@ test("data-* attributes", function() {
+ 		.attr("data-five", "5")
+ 		.attr("data-point", "5.5")
+ 		.attr("data-pointe", "5.5E3")
++		.attr("data-hexadecimal", "0x42")
+ 		.attr("data-pointbad", "5..5")
+ 		.attr("data-pointbad2", "-.")
+ 		.attr("data-badjson", "{123}")
+@@ -370,6 +371,7 @@ test("data-* attributes", function() {
+ 	strictEqual( child.data("five"), 5, "Primitive number read from attribute");
+ 	strictEqual( child.data("point"), 5.5, "Primitive number read from attribute");
+ 	strictEqual( child.data("pointe"), 5500, "Primitive number read from attribute");
++	strictEqual( child.data("hexadecimal"), 66, "Hexadecimal number read from attribute");
+ 	strictEqual( child.data("pointbad"), "5..5", "Bad number read from attribute");
+ 	strictEqual( child.data("pointbad2"), "-.", "Bad number read from attribute");
+ 	strictEqual( child.data("badjson"), "{123}", "Bad number read from attribute");
+diff --git a/test/unit/dimensions.js b/test/unit/dimensions.js
+index 222459f..c6b8e83 100644
+--- a/test/unit/dimensions.js
++++ b/test/unit/dimensions.js
+@@ -315,3 +315,17 @@ test("outerHeight()", function() {
+ 	div.remove();
+ 	jQuery.removeData($div[0], "olddisplay", true);
+ });
++
++testIframe("dimensions/documentSmall", "window vs. small document", function( jQuery, window, document ) {
++	expect(2);
++
++	equal( jQuery( document ).height(), jQuery( window ).height(), "document height matches window height");
++	equal( jQuery( document ).width(), jQuery( window ).width(), "document width matches window width");
++});
++
++testIframe("dimensions/documentLarge", "window vs. large document", function( jQuery, window, document ) {
++	expect(2);
++
++	ok( jQuery( document ).height() > jQuery( window ).height(), "document height is larger than window height");
++	ok( jQuery( document ).width() > jQuery( window ).width(), "document width is larger than window width");
++});
+diff --git a/test/unit/effects.js b/test/unit/effects.js
+index 2078dc6..e478cdf 100644
+--- a/test/unit/effects.js
++++ b/test/unit/effects.js
+@@ -263,6 +263,15 @@ test("animate negative height", function() {
+ 	});
+ });
+ 
++test("animate negative padding", function() {
++	expect(1);
++	stop();
++	jQuery("#foo").animate({ paddingBottom: -100 }, 100, function() {
++		equal( jQuery(this).css("paddingBottom"), "0px", "Verify paddingBottom." );
++		start();
++	});
++});
++
+ test("animate block as inline width/height", function() {
+ 	expect(3);
+ 
+@@ -1148,7 +1157,7 @@ function( method, defProp ) {
+ 	test( method + "().stop()." + method + "()", function() {
+ 		expect( 8 );
+ 
+-		var animTime = 100;
++		var animTime = 2000;
+ 
+ 		jQuery.each([ "in", "out" ], function( i, type ) {
+ 			var $elem = jQuery( "#" + method.toLowerCase() + type ),
+diff --git a/test/unit/event.js b/test/unit/event.js
+index dd4bbd5..3c9a081 100644
+--- a/test/unit/event.js
++++ b/test/unit/event.js
+@@ -1216,10 +1216,10 @@ test("Delegated events in SVG (#10791)", function() {
+ test("Delegated events in forms (#10844; #11145; #8165)", function() {
+ 	expect(3);
+ 
+-	// Aliases names like "id" cause havoc
++	// Alias names like "id" cause havoc
+ 	var form = jQuery(
+ 			'<form id="myform">'+
+-			'<input type="text" name="id" value="secret agent man" />'+
++				'<input type="text" name="id" value="secret agent man" />'+
+ 			'</form>'
+ 		)
+ 		.on( "submit", function( event ) {
+@@ -1259,6 +1259,44 @@ test("Delegated events in forms (#10844; #11145; #8165)", function() {
+ 	form.remove();
+ });
+ 
++test("Submit event can be stopped (#11049)", function() {
++	expect(1);
++
++	// Since we manually bubble in IE, make sure inner handlers get a chance to cancel
++	var form = jQuery(
++			'<form id="myform">'+
++				'<input type="text" name="sue" value="bawls" />'+
++				'<input type="submit" />'+
++			'</form>'
++		)
++		.appendTo("body");
++
++	jQuery( "body" )
++		.on( "submit", function() {
++			ok( true, "submit bubbled on first handler" );
++			return false;
++		})
++		.find( "#myform input[type=submit]" )
++			.each( function(){ this.click(); } )
++		.end()
++		.on( "submit", function() {
++			ok( false, "submit bubbled on second handler" );
++			return false;
++		})
++		.find( "#myform input[type=submit]" )
++			.each( function(){
++				jQuery( this.form ).on( "submit", function( e ) {
++					e.preventDefault();
++					e.stopPropagation();
++				});
++				this.click();
++			})
++		.end()
++		.off( "submit" );
++
++	form.remove();
++});
++
+ test("jQuery.Event( type, props )", function() {
+ 
+ 	expect(5);
+@@ -2664,7 +2702,7 @@ test("clone() delegated events (#11076)", function() {
+ 		clicked = function( event ) {
+ 			counter[ jQuery(this).text().replace(/\s+/, "") ]++;
+ 		},
+-		table = 
++		table =
+ 			jQuery( "<table><tr><td>center</td><td>fold</td></tr></table>" )
+ 			.on( "click", "tr", clicked )
+ 			.on( "click", "td:first-child", clicked )
+diff --git a/test/unit/manipulation.js b/test/unit/manipulation.js
+index 6f70773..ff31c4d 100644
+--- a/test/unit/manipulation.js
++++ b/test/unit/manipulation.js
+@@ -7,7 +7,7 @@ var bareObj = function(value) { return value; };
+ var functionReturningObj = function(value) { return (function() { return value; }); };
+ 
+ test("text()", function() {
+-	expect(4);
++	expect(5);
+ 	var expected = "This link has class=\"blog\": Simon Willison's Weblog";
+ 	equal( jQuery("#sap").text(), expected, "Check for merged text of more then one element." );
+ 
+@@ -20,6 +20,10 @@ test("text()", function() {
+ 		frag.appendChild( document.createTextNode("foo") );
+ 
+ 	equal( jQuery( frag ).text(), "foo", "Document Fragment Text node was retreived from .text().");
++
++	var $newLineTest = jQuery("<div>test<br/>testy</div>").appendTo("#moretests");
++	$newLineTest.find("br").replaceWith("\n");
++	equal( $newLineTest.text(), "test\ntesty", "text() does not remove new lines (#11153)" );
+ });
+ 
+ test("text(undefined)", function() {
+@@ -265,7 +269,7 @@ test("unwrap()", function() {
+ });
+ 
+ var testAppend = function(valueObj) {
+-	expect(41);
++	expect(46);
+ 	var defaultText = "Try them out:"
+ 	var result = jQuery("#first").append(valueObj("<b>buga</b>"));
+ 	equal( result.text(), defaultText + "buga", "Check if text appending works" );
+@@ -318,6 +322,12 @@ var testAppend = function(valueObj) {
+ 	}).remove();
+ 
+ 	QUnit.reset();
++	jQuery("form").append(valueObj("<input type='radio' checked='checked' name='radiotest' />"));
++	jQuery("form input[name=radiotest]").each(function(){
++		ok( jQuery(this).is(":checked"), "Append with name attribute after checked attribute");
++	}).remove();
++
++	QUnit.reset();
+ 	jQuery("#sap").append(valueObj( document.getElementById("form") ));
+ 	equal( jQuery("#sap>form").size(), 1, "Check for appending a form" ); // Bug #910
+ 
+@@ -1169,6 +1179,15 @@ test("clone()", function() {
+ 	equal( jQuery("body").clone().children()[0].id, "qunit-header", "Make sure cloning body works" );
+ });
+ 
++test("clone(script type=non-javascript) (#11359)", function() {
++	expect(3);
++	var src = jQuery("<script type='text/filler'>Lorem ipsum dolor sit amet</script><q><script type='text/filler'>consectetur adipiscing elit</script></q>");
++	var dest = src.clone();
++	equal( dest[0].text, "Lorem ipsum dolor sit amet", "Cloning preserves script text" );
++	equal( dest.last().html(), src.last().html(), "Cloning preserves nested script text" );
++	ok( /^\s*<scr.pt\s+type=['"]?text\/filler['"]?\s*>consectetur adipiscing elit<\/scr.pt>\s*$/i.test( dest.last().html() ), "Cloning preserves nested script text" );
++});
++
+ test("clone(form element) (Bug #3879, #6655)", function() {
+ 	expect(5);
+ 	var element = jQuery("<select><option>Foo</option><option selected>Bar</option></select>");
+@@ -1218,13 +1237,23 @@ test("clone() on XML nodes", function() {
+ });
+ }
+ 
++test("clone() on local XML nodes with html5 nodename", function() {
++	expect(2);
++
++	var $xmlDoc = jQuery( jQuery.parseXML( "<root><meter /></root>" ) ),
++		$meter = $xmlDoc.find( "meter" ).clone();
++
++	equal( $meter[0].nodeName, "meter", "Check if nodeName was not changed due to cloning" );
++	equal( $meter[0].nodeType, 1, "Check if nodeType is not changed due to cloning" );
++});
++
+ test("html(undefined)", function() {
+ 	expect(1);
+ 	equal( jQuery("#foo").html("<i>test</i>").html(undefined).html().toLowerCase(), "<i>test</i>", ".html(undefined) is chainable (#5571)" );
+ });
+ 
+ var testHtml = function(valueObj) {
+-	expect(34);
++	expect(35);
+ 
+ 	jQuery.scriptorder = 0;
+ 
+@@ -1279,7 +1308,7 @@ var testHtml = function(valueObj) {
+ 
+ 	QUnit.reset();
+ 
+-	jQuery("#qunit-fixture").html(valueObj("<script type='something/else'>ok( false, 'Non-script evaluated.' );</script><script type='text/javascript'>ok( true, 'text/javascript is evaluated.' );</script><script>ok( true, 'No type is evaluated.' );</script><div><script type='text/javascript'>ok( true, 'Inner text/javascript is evaluated.' );</script><script>ok( true, 'Inner No type is evaluated.' );</script><script type='something/else'>ok( false, 'Non-script evaluated.' );</script></div>"));
++	jQuery("#qunit-fixture").html(valueObj("<script type='something/else'>ok( false, 'Non-script evaluated.' );</script><script type='text/javascript'>ok( true, 'text/javascript is evaluated.' );</script><script>ok( true, 'No type is evaluated.' );</script><div><script type='text/javascript'>ok( true, 'Inner text/javascript is evaluated.' );</script><script>ok( true, 'Inner No type is evaluated.' );</script><script type='something/else'>ok( false, 'Non-script evaluated.' );</script><script type='type/ecmascript'>ok( true, 'type/ecmascript evaluated.' );</script></div>"));
+ 
+ 	var child = jQuery("#qunit-fixture").find("script");
+ 
+@@ -1305,7 +1334,7 @@ test("html(String)", function() {
+ test("html(Function)", function() {
+ 	testHtml(functionReturningObj);
+ 
+-	expect(36);
++	expect(37);
+ 
+ 	QUnit.reset();
+ 
+@@ -1715,3 +1744,15 @@ test("jQuery.fragments cache expectations", function() {
+ 
+ 	equal( fragmentCacheSize(), 12, "12 entries exist in jQuery.fragments, 2" );
+ });
++
++test("Guard against exceptions when clearing safeChildNodes", function() {
++	expect( 1 );
++
++	var div;
++
++	try {
++		div = jQuery("<div/><hr/><code/><b/>");
++	} catch(e) {}
++
++	ok( div && div.jquery, "Created nodes safely, guarded against exceptions on safeChildNodes[ -1 ]" );
++});
+\ No newline at end of file
+diff --git a/test/unit/offset.js b/test/unit/offset.js
+index 466e650..526b937 100644
+--- a/test/unit/offset.js
++++ b/test/unit/offset.js
+@@ -11,7 +11,7 @@ test("disconnected node", function() {
+ 
+ var supportsScroll = false;
+ 
+-testoffset("absolute", function($, iframe) {
++testIframe("offset/absolute", "absolute", function($, iframe) {
+ 	expect(4);
+ 
+ 	var doc = iframe.document, tests;
+@@ -51,7 +51,7 @@ testoffset("absolute", function($, iframe) {
+ 	forceScroll.remove();
+ });
+ 
+-testoffset("absolute", function( jQuery ) {
++testIframe("offset/absolute", "absolute", function( jQuery ) {
+ 	expect(178);
+ 
+ 	// get offset tests
+@@ -136,7 +136,7 @@ testoffset("absolute", function( jQuery ) {
+ 	});
+ });
+ 
+-testoffset("relative", function( jQuery ) {
++testIframe("offset/relative", "relative", function( jQuery ) {
+ 	expect(60);
+ 
+ 	// IE is collapsing the top margin of 1px
+@@ -197,7 +197,7 @@ testoffset("relative", function( jQuery ) {
+ 	});
+ });
+ 
+-testoffset("static", function( jQuery ) {
++testIframe("offset/static", "static", function( jQuery ) {
+ 	expect(80);
+ 
+ 	// IE is collapsing the top margin of 1px
+@@ -264,7 +264,7 @@ testoffset("static", function( jQuery ) {
+ 	});
+ });
+ 
+-testoffset("fixed", function( jQuery ) {
++testIframe("offset/fixed", "fixed", function( jQuery ) {
+ 	expect(30);
+ 
+ 	var tests = [
+@@ -331,7 +331,7 @@ testoffset("fixed", function( jQuery ) {
+ 	}
+ });
+ 
+-testoffset("table", function( jQuery ) {
++testIframe("offset/table", "table", function( jQuery ) {
+ 	expect(4);
+ 
+ 	equal( jQuery("#table-1").offset().top, 6, "jQuery('#table-1').offset().top" );
+@@ -341,7 +341,7 @@ testoffset("table", function( jQuery ) {
+ 	equal( jQuery("#th-1").offset().left, 10, "jQuery('#th-1').offset().left" );
+ });
+ 
+-testoffset("scroll", function( jQuery, win ) {
++testIframe("offset/scroll", "scroll", function( jQuery, win ) {
+ 	expect(24);
+ 
+ 	var ie = jQuery.browser.msie && parseInt( jQuery.browser.version, 10 ) < 8;
+@@ -399,7 +399,7 @@ testoffset("scroll", function( jQuery, win ) {
+ 	strictEqual( jQuery().scrollLeft(), null, "jQuery().scrollLeft(100) testing setter on empty jquery object" );
+ });
+ 
+-testoffset("body", function( jQuery ) {
++testIframe("offset/body", "body", function( jQuery ) {
+ 	expect(2);
+ 
+ 	equal( jQuery("body").offset().top, 1, "jQuery('#body').offset().top" );
+@@ -466,35 +466,3 @@ test("fractions (see #7730 and #7885)", function() {
+ 
+ 	div.remove();
+ });
+-
+-function testoffset(name, fn) {
+-
+-	test(name, function() {
+-		// pause execution for now
+-		stop();
+-
+-		// load fixture in iframe
+-		var iframe = loadFixture(),
+-			win = iframe.contentWindow,
+-			interval = setInterval( function() {
+-				if ( win && win.jQuery && win.jQuery.isReady ) {
+-					clearInterval( interval );
+-					// continue
+-					start();
+-					// call actual tests passing the correct jQuery isntance to use
+-					fn.call( this, win.jQuery, win );
+-					document.body.removeChild( iframe );
+-					iframe = null;
+-				}
+-			}, 15 );
+-	});
+-
+-	function loadFixture() {
+-		var src = "./data/offset/" + name + ".html?" + parseInt( Math.random()*1000, 10 ),
+-			iframe = jQuery("<iframe />").css({
+-				width: 500, height: 500, position: "absolute", top: -600, left: -600, visibility: "hidden"
+-			}).appendTo("body")[0];
+-		iframe.contentWindow.location = src;
+-		return iframe;
+-	}
+-}
+diff --git a/test/unit/queue.js b/test/unit/queue.js
+index bb2d6ba..6365df1 100644
+--- a/test/unit/queue.js
++++ b/test/unit/queue.js
+@@ -145,7 +145,7 @@ test("delay() can be stopped", function() {
+ 			ok( true, "This first function was dequeued" );
+ 			next();
+ 		})
+-		.delay( 100, "alternate" )
++		.delay( 1000, "alternate" )
+ 		.queue( "alternate", function() {
+ 			run++;
+ 			ok( true, "The function was dequeued immediately, the delay was stopped" );
+@@ -156,7 +156,7 @@ test("delay() can be stopped", function() {
+ 		.stop( "alternate", false, false )
+ 
+ 		// this test
+-		.delay( 100 )
++		.delay( 1000 )
+ 		.queue(function() {
+ 			run++;
+ 			ok( false, "This queue should never run" );
+@@ -167,7 +167,7 @@ test("delay() can be stopped", function() {
+ 
+ 	equal( run, 2, "Queue ran the proper functions" );
+ 
+-	setTimeout( start, 200 );
++	setTimeout( start, 2000 );
+ });
+ 
+ 
+@@ -293,3 +293,13 @@ test("promise()", function() {
+ 		this.dequeue();
+ 	});
+ });
++
++test(".promise(obj)", function() {
++	expect(2);
++
++	var obj = {};
++	var promise = jQuery( "#foo" ).promise( "promise", obj );
++
++	ok( jQuery.isFunction( promise.promise ), ".promise(type, obj) returns a promise" );
++	strictEqual( promise, obj, ".promise(type, obj) returns obj" );
++});
+diff --git a/test/unit/selector.js b/test/unit/selector.js
+index 329ff82..a5758a1 100644
+--- a/test/unit/selector.js
++++ b/test/unit/selector.js
+@@ -6,47 +6,7 @@
+ 
+ module("selector - jQuery only", { teardown: moduleTeardown });
+ 
+-/**
+- * Loads an iframe for the selector context
+- * @param {String} fileName - Name of the html file to load
+- * @param {String} name - Test name
+- * @param {Function} fn - Test callback containing the tests to run
+- */
+-var testIframe = function( fileName, name, fn ) {
+-
+-	var loadFixture = function() {
+-
+-		// Creates iframe with cache disabled
+-		var src = "./data/selector/" + fileName + ".html?" + parseInt( Math.random()*1000, 10 ),
+-			iframe = jQuery("<iframe />").css({
+-				width: 500, height: 500, position: "absolute", top: -600, left: -600, visibility: "hidden"
+-			}).appendTo("body")[0];
+-		iframe.contentWindow.location = src;
+-		return iframe;
+-	};
+-
+-	test(name, function() {
+-		// pause execution for now
+-		stop();
+-
+-		// load fixture in iframe
+-		var iframe = loadFixture(),
+-			win = iframe.contentWindow,
+-			interval = setInterval( function() {
+-				if ( win && win.jQuery && win.jQuery.isReady ) {
+-					clearInterval( interval );
+-					// continue
+-					start();
+-					// call actual tests passing the correct jQuery instance to use
+-					fn.call( this, win.jQuery, win, win.document );
+-					document.body.removeChild( iframe );
+-					iframe = null;
+-				}
+-			}, 15 );
+-	});
+-};
+-
+-testIframe("html5_selector", "attributes - jQuery.attr", function( jQuery, window, document ) {
++testIframe("selector/html5_selector", "attributes - jQuery.attr", function( jQuery, window, document ) {
+ 	expect(34);
+ 
+ 	/**
+@@ -61,7 +21,7 @@ testIframe("html5_selector", "attributes - jQuery.attr", function( jQuery, windo
+ 		}
+ 		return r;
+ 	}
+-			   
++
+ 	/**
+ 	 * Asserts that a select matches the given IDs * @example t("Check for something", "//[a]", ["foo", "baar"]);
+ 	 * @param {String} a - Assertion name
+@@ -72,7 +32,7 @@ testIframe("html5_selector", "attributes - jQuery.attr", function( jQuery, windo
+ 		var f = jQuery(b).get(),
+ 			s = "",
+ 			i = 0;
+-		
++
+ 		for ( ; i < f.length; i++ ) {
+ 			s += (s && ",") + '"' + f[i].id + '"';
+ 		}
+@@ -132,7 +92,7 @@ testIframe("html5_selector", "attributes - jQuery.attr", function( jQuery, windo
+ 	t( "Improperly named form elements do not interfere with form selections (#9570)", "form[name='formName']", ["form1"]);
+ });
+ 
+-testIframe("sizzle_cache", "Sizzle cache collides with multiple Sizzles on a page", function( jQuery, window, document ) {
++testIframe("selector/sizzle_cache", "Sizzle cache collides with multiple Sizzles on a page", function( jQuery, window, document ) {
+ 	var $cached = window.$cached;
+ 
+ 	expect(3);
+diff --git a/test/unit/traversing.js b/test/unit/traversing.js
+index 63d46dd..8e8b536 100644
+--- a/test/unit/traversing.js
++++ b/test/unit/traversing.js
+@@ -414,7 +414,7 @@ test("andSelf()", function() {
+ });
+ 
+ test("siblings([String])", function() {
+-	expect(6);
++	expect(7);
+ 	deepEqual( jQuery("#en").siblings().get(), q("sndp", "sap"), "Check for siblings" );
+ 	deepEqual( jQuery("#sndp").siblings(":has(code)").get(), q("sap"), "Check for filtered siblings (has code child element)" );
+ 	deepEqual( jQuery("#sndp").siblings(":has(a)").get(), q("en", "sap"), "Check for filtered siblings (has anchor child element)" );
+@@ -422,6 +422,7 @@ test("siblings([String])", function() {
+ 	var set = q("sndp", "en", "sap");
+ 	deepEqual( jQuery("#en, #sndp").siblings().get(), set, "Check for unique results from siblings" );
+ 	deepEqual( jQuery("#option5a").siblings("option[data-attr]").get(), q("option5c"), "Has attribute selector in siblings (#9261)" );
++	equal( jQuery("<a/>").siblings().length, 0, "Detached elements have no siblings (#11370)" );
+ });
+ 
+ test("children([String])", function() {
+diff --git a/version.txt b/version.txt
+index edb69a0..0330b0e 100644
+--- a/version.txt
++++ b/version.txt
+@@ -1 +1 @@
+-1.7.2pre
+\ No newline at end of file
++1.7.3pre
+\ No newline at end of file
