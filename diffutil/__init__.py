@@ -52,8 +52,14 @@ class DiffUtil(object):
         Check the type of diff
         """
         _u = re.compile('@@\s[\-0-9,]+\s[\+0-9,]+\s@@')
+        _n = re.compile('\d+(c|a|d)\d+(\n|\r)<')
+        _c = re.compile('\*{3}\s\d+,?\d+?\s\*{4}')
         if _u.search(self._diff):
             return self.TYPE_UNIFIED
+        elif _n.search(self._diff):
+            return self.TYPE_NORMAL
+        elif _c.search(self._diff):
+            return self.TYPE_CONTEXT
         return self.TYPE_UNKNOWN
 
     

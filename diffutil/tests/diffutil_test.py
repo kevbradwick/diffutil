@@ -28,6 +28,10 @@ class DiffUtilTest(unittest.TestCase):
         diff = DiffUtil(diff_text='foo')
         self.assertEqual(DiffUtil.TYPE_UNKNOWN, diff.format)
 
-#    def test_detect_normal_format(self):
-#        diff = DiffUtil(diff_file=os.path.join(diff_path, 'normal', 'jquery-1.3-1.7.diff'))
-#        self.assertEqual(DiffUtil.TYPE_NORMAL, diff.format)
+    def test_detect_normal_format(self):
+        diff = DiffUtil(diff_file=os.path.join(diff_path, 'normal', 'jquery-1.3-1.7.diff'))
+        self.assertEqual(DiffUtil.TYPE_NORMAL, diff.format)
+
+    def test_detect_context_format(self):
+        diff = DiffUtil(diff_file=os.path.join(diff_path, 'context', 'jquery-1.3-1.7.diff'))
+        self.assertEqual(DiffUtil.TYPE_CONTEXT, diff.format)
