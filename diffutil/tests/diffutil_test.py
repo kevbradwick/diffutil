@@ -46,3 +46,6 @@ class DiffUtilTest(unittest.TestCase):
         diff = DiffUtil(diff_file=os.path.join(diff_path, 'unified', 'jquery_754bda21.diff'))
         sections = diff.sections
         self.assertEqual(4, len(sections))
+        diff = DiffUtil(diff_file=os.path.join(diff_path, 'unified', 'jquery_eefead3d9629d68407600831a23c58a25163489e.diff'))
+        sections = diff.sections
+        self.assertEqual(37, len(sections))

@@ -8,22 +8,34 @@ class Diff(object):
         Pass the raw diff text in to the constructor
         """
         self._raw_diff = diff
+        self._diff = list()
+        self.init()
+
+    def init(self): pass
 
 class UnifiedDiff(Diff):
 
-    def sections(self):
+    def init(self):
+        """
+        Process the diff, extracting its sections, chunks and changset information
+        """
         pattern = re.compile(r'^(diff.*?)(?=^diff|\Z)', re.M | re.S)
-        sections = []
         for section in pattern.findall(self._raw_diff):
             _section = dict()
             _section['raw_diff'] = section
+            _section['chunks'] = []
+
+            # get the file for this section
             for line in section:
                 if line.startswith('---'):
                     _section['left_file'] = line.split('--- ')[1]
                 elif line.startswith('+++'):
                     _section['right_file'] = line.split('+++ ')[1]
-            sections.append(_section)
-        return sections
+
+            self._diff.append(_section)
+
+    def sections(self):
+        return self._diff
 
 class ContextDiff(Diff):
     pass
