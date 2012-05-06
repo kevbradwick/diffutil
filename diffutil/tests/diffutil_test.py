@@ -45,4 +45,4 @@ class DiffUtilTest(unittest.TestCase):
         """
         diff = DiffUtil(diff_file=os.path.join(diff_path, 'unified', 'jquery_754bda21.diff'))
         sections = diff.sections
-#        self.assertEqual(5, len(sections))
+        self.assertEqual(4, len(sections))

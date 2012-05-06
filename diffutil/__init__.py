@@ -4,10 +4,16 @@ import re
 class Diff(object):
 
     def __init__(self, diff):
+        """
+        Pass the raw diff text in to the constructor
+        """
         self._raw_diff = diff
 
 class UnifiedDiff(Diff):
-    pass
+
+    def sections(self):
+        pattern = re.compile(r'^(diff.*?)(?=^diff|\Z)', re.M | re.S)
+        return pattern.findall(self._raw_diff)
 
 class ContextDiff(Diff):
     pass
@@ -82,9 +88,10 @@ class DiffUtil(object):
 
         return self._diff_object
 
+
     @property
     def sections(self):
         """
         Get the sections of the diff file
         """
-        return []
+        return self.diff_object.sections()
