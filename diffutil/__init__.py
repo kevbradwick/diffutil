@@ -13,7 +13,17 @@ class UnifiedDiff(Diff):
 
     def sections(self):
         pattern = re.compile(r'^(diff.*?)(?=^diff|\Z)', re.M | re.S)
-        return pattern.findall(self._raw_diff)
+        sections = []
+        for section in pattern.findall(self._raw_diff):
+            _section = dict()
+            _section['raw_diff'] = section
+            for line in section:
+                if line.startswith('---'):
+                    _section['left_file'] = line.split('--- ')[1]
+                elif line.startswith('+++'):
+                    _section['right_file'] = line.split('+++ ')[1]
+            sections.append(_section)
+        return sections
 
 class ContextDiff(Diff):
     pass
