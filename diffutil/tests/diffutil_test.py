@@ -3,7 +3,7 @@ Info on reading diffs;
 http://www.markusbe.com/2009/12/how-to-read-a-patch-or-diff-and-understand-its-structure-to-apply-it-manually/
 
 """
-from diffutil import DiffUtil
+from diffutil import *
 import unittest
 import os
 
@@ -23,6 +23,7 @@ class DiffUtilTest(unittest.TestCase):
     def test_detect_unified_format(self):
         diff = DiffUtil(diff_file=os.path.join(diff_path, 'unified', 'jquery_754bda21.diff'))
         self.assertEqual(DiffUtil.TYPE_UNIFIED, diff.format)
+        self.assertIsInstance(diff.diff_object, UnifiedDiff)
 
     def test_detect_unknown_format(self):
         diff = DiffUtil(diff_text='foo')
@@ -31,7 +32,17 @@ class DiffUtilTest(unittest.TestCase):
     def test_detect_normal_format(self):
         diff = DiffUtil(diff_file=os.path.join(diff_path, 'normal', 'jquery-1.3-1.7.diff'))
         self.assertEqual(DiffUtil.TYPE_NORMAL, diff.format)
+        self.assertIsInstance(diff.diff_object, NormalDiff)
 
     def test_detect_context_format(self):
         diff = DiffUtil(diff_file=os.path.join(diff_path, 'context', 'jquery-1.3-1.7.diff'))
         self.assertEqual(DiffUtil.TYPE_CONTEXT, diff.format)
+        self.assertIsInstance(diff.diff_object, ContextDiff)
+
+    def test_sections(self):
+        """
+        Analyse the sections of each diff
+        """
+        diff = DiffUtil(diff_file=os.path.join(diff_path, 'unified', 'jquery_754bda21.diff'))
+        sections = diff.sections
+#        self.assertEqual(5, len(sections))

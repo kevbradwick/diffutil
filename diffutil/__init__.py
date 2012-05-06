@@ -62,8 +62,9 @@ class DiffUtil(object):
             return self.TYPE_CONTEXT
         return self.TYPE_UNKNOWN
 
-    
-    def _get_diff_object(self):
+
+    @property
+    def diff_object(self):
         """
         Get the Diff object
         """
@@ -80,3 +81,10 @@ class DiffUtil(object):
             raise RuntimeError('Invalid diff format supplied')
 
         return self._diff_object
+
+    @property
+    def sections(self):
+        """
+        Get the sections of the diff file
+        """
+        return []
