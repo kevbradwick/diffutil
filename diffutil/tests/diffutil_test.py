@@ -21,9 +21,13 @@ class DiffUtilTest(unittest.TestCase):
         self.assertRaises(ValueError, DiffUtil, diff_file='foo')
 
     def test_detect_unified_format(self):
-        diff = DiffUtil(diff_file=os.path.join(diff_path, 'jquery_754bda21.diff'))
+        diff = DiffUtil(diff_file=os.path.join(diff_path, 'unified', 'jquery_754bda21.diff'))
         self.assertEqual(DiffUtil.TYPE_UNIFIED, diff.format)
 
     def test_detect_unknown_format(self):
         diff = DiffUtil(diff_text='foo')
         self.assertEqual(DiffUtil.TYPE_UNKNOWN, diff.format)
+
+#    def test_detect_normal_format(self):
+#        diff = DiffUtil(diff_file=os.path.join(diff_path, 'normal', 'jquery-1.3-1.7.diff'))
+#        self.assertEqual(DiffUtil.TYPE_NORMAL, diff.format)
