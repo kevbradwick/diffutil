@@ -23,14 +23,15 @@ class UnifiedDiff(Diff):
         for section in pattern.findall(self._raw_diff):
             _section = dict()
             _section['raw_diff'] = section
-            _section['chunks'] = []
 
             # get the file for this section
-            for line in section:
+            for line in section.splitlines():
                 if line.startswith('---'):
                     _section['left_file'] = line.split('--- ')[1]
                 elif line.startswith('+++'):
                     _section['right_file'] = line.split('+++ ')[1]
+
+            _section['chunks'] = re.compile(r'^(@@\s\-\d+.*?)(?=^@@|\Z)', re.M | re.S).findall(section)
 
             self._diff.append(_section)
 
@@ -117,3 +118,9 @@ class DiffUtil(object):
         Get the sections of the diff file
         """
         return self.diff_object.sections()
+
+    def __repr__(self):
+        return self.__unicode__()
+
+    def __unicode__(self):
+        return self._diff

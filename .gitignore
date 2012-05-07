@@ -4,3 +4,4 @@ __MACOSX
 *.pyc
 *.coverage
 cover
+test.py
